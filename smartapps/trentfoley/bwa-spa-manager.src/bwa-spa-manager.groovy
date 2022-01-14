@@ -143,7 +143,7 @@ def getSpas() {
 def cacheSpas(spa) {
     // save in state so we can re-use in settings
     def spas = [:]
-    spas[[app.id, spa.device_id].join('.')] = "Spa " + spa.device_id[-8..-1]
+    spas[spa.device_id] = "Spa " + spa.device_id[-8..-1]
     state.spas = spas
     state.device = spa
     spa
@@ -158,7 +158,7 @@ def doCallout(calloutMethod, urlPath, calloutBody, contentType) {
 }
 
 def doCallout(calloutMethod, urlPath, calloutBody, contentType, queryParams){
-    log.info "\"${calloutMethod}\"-ing ${contentType} to \"${urlPath}\""
+    log.debug("doCallout(${calloutMethod}, ${urlPath}, ${calloutBody}, ${contentType}, ${queryParams})")
     def content_type
     switch(contentType) {
         case "xml":
@@ -261,19 +261,11 @@ def setThermostatMode(child, mode) {
     }
 }
 
-
-def getXmlRequest(deviceId, fileName) {
-    "<sci_request version=\"1.0\"><file_system cache=\"false\"><targets><device id=\"${deviceId}\"/></targets><commands><get_file path=\"${fileName}.txt\"/></commands></file_system></sci_request>"
-}
-
 def sendCommand(deviceId, targetName, data) {
     log.debug("sendCommand(${deviceId}, ${targetName}, ${data})")
-    def resp = doCallout("POST", "/devices/sci", getXmlRequest(deviceId, targetName, data), "xml")
+	def request = "<sci_request version=\"1.0\"><data_service><targets><device id=\"${deviceId}\"/></targets><requests><device_request target_name=\"${targetName}\">${data}</device_request></requests></data_service></sci_request>"
+    def resp = doCallout("POST", "/devices/sci", request, "xml")
     resp.data
-}
-
-def getXmlRequest(deviceId, targetName, data) {
-    "<sci_request version=\"1.0\"><data_service><targets><device id=\"${deviceId}\"/></targets><requests><device_request target_name=\"${targetName}\">${data}</device_request></requests></data_service></sci_request>"
 }
 
 def isoFormat() {
@@ -291,13 +283,19 @@ def parseStDate(dateStr) {
 // Invoked from child device and initialize method
 def pollChild(child) {
     log.debug("pollChild(${child.device.deviceNetworkId})")
-
-    def resp = doCallout("POST", "/devices/sci", getXmlRequest(device_id, "PanelUpdate"), "xml")
+    
+	def request = "<sci_request version=\"1.0\"><file_system cache=\"false\"><targets><device id=\"${child.device.deviceNetworkId}\"/></targets><commands><get_file path=\"PanelUpdate.txt\"/></commands></file_system></sci_request>"
+    def resp = doCallout("POST", "/devices/sci", request, "xml")
+    
     def encodedData = resp.data
 
     byte[] decoded = encodedData.decodeBase64()
     
     log.debug(decoded.toString())
+
+	if (decoded.size() < 6) {
+        return
+    }
 
     // def messageLength = new BigInteger(1, decoded[0])
     def actualTemperature = new BigInteger(1, decoded[6])
