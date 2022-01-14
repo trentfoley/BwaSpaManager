@@ -63,6 +63,7 @@ def getTemperatureRange() {
 // called from parent when initially setup
 def initialize() {
 	log.debug "initialize()"
+    sendEvent(name: "supportedThermostatModes", value: ["auto", "schedule"], displayed: false)
     refresh()
     runEvery15Minutes(refresh)
 }
@@ -75,7 +76,6 @@ def parse(String description) {
 // Implementation of capability.refresh
 def refresh() {
     log.debug "refresh()"
-    
     def data = parent.pollChild(this)
 
     if(data) {
@@ -91,16 +91,16 @@ def refresh() {
 // Implementation of capability.thermostatHeatingSetpoint
 def setHeatingSetpoint(degreesF) {
     log.debug "setHeatingSetpoint(${degreesF})"
-    sendEvent(name: "heatingSetpoint", value: degreesF, unit: "F")
     parent.setHeatingSetpoint(this, degreesF)
+    sendEvent(name: "heatingSetpoint", value: degreesF, unit: "F")
 }
 
 // Implementation of capability.thermostatMode
 // Valid values are: "auto" and "schedule"
 def setThermostatMode(String mode) {
     log.debug "setThermostatMode(${mode})"
-    sendEvent(name: "thermostatMode", value: mode)
     parent.setThermostatMode(this, mode)
+    sendEvent(name: "thermostatMode", value: mode)
 }
 
 // Implementation of capability.thermostatMode
