@@ -13,8 +13,6 @@
  *  for the specific language governing permissions and limitations under the License.
  */
 
-import groovy.time.TimeCategory
-
 metadata {
     definition (name: "BWA Spa", namespace: "trentfoley", author: "Trent Foley") {
         capability "Temperature Measurement"
@@ -56,6 +54,10 @@ metadata {
 
         details(["temperature", "heatSliderControl", "thermostatModeControl", "refresh"])
     }
+}
+
+def getTemperatureRange() {
+	"(26.5..104)"
 }
 
 // called from parent when initially setup

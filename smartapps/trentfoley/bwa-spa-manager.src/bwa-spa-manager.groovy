@@ -14,6 +14,8 @@
  *  
  */
 
+ import groovy.time.TimeCategory
+
 definition(
     name: "BWA Spa Manager",
     namespace: "trentfoley",
