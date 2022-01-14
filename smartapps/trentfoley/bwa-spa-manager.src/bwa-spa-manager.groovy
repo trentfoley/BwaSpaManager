@@ -1,7 +1,7 @@
 /*
  *  BWA Spa Manager
  *
- *  Copyright 2020 Nathan Spencer
+ *  Copyright 2022 Trent Foley
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -12,22 +12,17 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *  
- *  CHANGE HISTORY
- *  VERSION     DATE            NOTES
- *  0.9.0       2020-01-30      Initial release with basic access and control of spas
- *  1.0.0       2020-01-31      Updated icons and bumped version to match DTH version
- *
  */
 
 definition(
     name: "BWA Spa Manager",
-    namespace: "natekspencer",
-    author: "Nathan Spencer",
+    namespace: "trentfoley",
+    author: "Trent Foley",
     description: "Access and control your BWA Spa.",
     category: "Health & Wellness",
-    iconUrl: "https://raw.githubusercontent.com/natekspencer/BwaSpaManager/master/images/hot-tub.png",
-    iconX2Url: "https://raw.githubusercontent.com/natekspencer/BwaSpaManager/master/images/hot-tub.png",
-    iconX3Url: "https://raw.githubusercontent.com/natekspencer/BwaSpaManager/master/images/hot-tub.png",
+    iconUrl: "https://raw.githubusercontent.com/trentfoley/BwaSpaManager/master/images/hot-tub.png",
+    iconX2Url: "https://raw.githubusercontent.com/trentfoley/BwaSpaManager/master/images/hot-tub.png",
+    iconX3Url: "https://raw.githubusercontent.com/trentfoley/BwaSpaManager/master/images/hot-tub.png",
     singleInstance: false
 ) {
 }
@@ -53,9 +48,6 @@ def mainPage() {
             if (spas) {
                 section("Select which Spas to use:") {
                     input(name: "spas", type: "enum", title: "Spas", required: false, multiple: true, metadata: [values: spas])
-                }
-                section("How frequently do you want to poll the BWA cloud for changes? (Use a lower number if you care about trying to capture and respond to \"change\" events as they happen)") {
-                    input(name: "pollingInterval", title: "Polling Interval (in Minutes)", type: "enum", required: false, multiple: false, defaultValue: 5, description: "5", options: ["1", "5", "10", "15", "30"])
                 }
             }
             section("BWA Authentication") {
@@ -216,15 +208,19 @@ def doCallout(calloutMethod, urlPath, calloutBody, contentType, queryParams){
 }
 
 def installed() {
+    log.debug("installed()")
     initialize()
 }
 
 def updated() {
+    log.debug("updated()")
     unsubscribe()
     initialize()
 }
 
 def initialize() {
+    log.debug("initialize()")
+
     // Not sure when tokens expire, but will get a new one every 24 hours just in case by scheduling to reauthorize every day
     if(state.loginDate?.trim()) schedule(parseStDate(state.loginDate), reAuth)
 
@@ -233,55 +229,43 @@ def initialize() {
         deleteChildDevice(it.deviceNetworkId)
     }
     
-    def childDevices = []
     settings.spas.each {deviceId ->
         try {
             def childDevice = getChildDevice(deviceId)
             if(!childDevice) {
-                log.info "Adding device: ${state.spas[deviceId]} [${deviceId}]"
+                log.info("Adding device: ${state.spas[deviceId]} [${deviceId}]")
                 childDevice = addChildDevice(app.namespace, "BWA Spa", deviceId, location.hubs[0]?.id, [label: state.spas[deviceId], completedSetup: true])
                 childDevice.parseDeviceData(state.device)
+                childDevice.initialize()
             }
-            childDevices.add(childDevice)
         } catch (e) {
-            log.error "Error creating device: ${e}"
-        }
-    }
-    
-    // set up polling only if we have child devices
-    if(childDevices.size() > 0) {
-        pollChildren()
-        "runEvery${pollingInterval}Minute${pollingInterval != "1" ? 's' : ''}"("pollChildren")
-    } else unschedule(pollChildren)
-}
-
-def pollChildren() {
-    log.info "polling..."
-    def devices = getChildDevices()
-    if (devices.size() == 0) {
-        log.info "no children to update: skipping polling"
-    } else {
-        devices.each {
-            def dni = it.deviceNetworkId
-            def deviceData = getPanelUpdate(it.currentValue("device_id"))
-            it.parsePanelData(deviceData)
+            log.error("Error creating device: ${e}")
         }
     }
 }
 
-// Get panel update
-def getPanelUpdate(device_id) {
-    log.info "getting panel update for ${device_id}"
-    def resp = doCallout("POST", "/devices/sci", getXmlRequest(device_id, "PanelUpdate"), "xml")
-    resp.data
+// Invoked from child device
+def setHeatingSetpoint(child, degreesF) {
+    log.debug("setHeatingSetpoint(${child.device.deviceNetworkId}, ${degreesF})")
+    sendCommand(child.device.deviceNetworkId, "SetTemp", degreesF);
 }
+
+// Invoked from child device.  Mode is either auto or schedule
+def setThermostatMode(child, mode) {
+    log.debug("setThermostatMode(${child.device.deviceNetworkId}, ${mode})")
+    def currentMode = child.device.currentValue("thermostatMode")
+    if (mode != currentMode) {
+        sendCommand(child.device.deviceNetworkId, "Button", 81); // 81 = BWA code for HeatMode button
+    }
+}
+
 
 def getXmlRequest(deviceId, fileName) {
     "<sci_request version=\"1.0\"><file_system cache=\"false\"><targets><device id=\"${deviceId}\"/></targets><commands><get_file path=\"${fileName}.txt\"/></commands></file_system></sci_request>"
 }
 
 def sendCommand(deviceId, targetName, data) {
-    log.info "sending ${targetName}:${data} command for ${deviceId}"
+    log.debug("sendCommand(${deviceId}, ${targetName}, ${data})"
     def resp = doCallout("POST", "/devices/sci", getXmlRequest(deviceId, targetName, data), "xml")
     resp.data
 }
@@ -300,4 +284,36 @@ def toStDateString(date) {
 
 def parseStDate(dateStr) {
     dateStr?.trim() ? timeToday(dateStr) : null
+}
+
+// Invoked from child device and initialize method
+def pollChild(child) {
+    log.debug("pollChild(${child.device.deviceNetworkId})")
+
+    def resp = doCallout("POST", "/devices/sci", getXmlRequest(device_id, "PanelUpdate"), "xml")
+    def encodedData = resp.data
+
+    byte[] decoded = encodedData.decodeBase64()
+    
+    // def messageLength = new BigInteger(1, decoded[0])
+    def actualTemperature = new BigInteger(1, decoded[6])
+    // def currentTimeHour = new BigInteger(1, decoded[7])
+    // def currentTimeMinute = new BigInteger(1, decoded[8])
+    def heatMode = new BigInteger(1, decoded[9])
+    def flag1 = new BigInteger(1, decoded[13])    
+    def flag2 = new BigInteger(1, decoded[14])
+    //def temperatureRange = (flag2 & 4) == 4 ? "high" : "low"
+    def isHeating = (flag2 & 48) != 0
+    
+    if (actualTemperature == 255) {
+    	actualTemperature = child.device.currentValue("temperature")
+    }
+
+    return [
+        temperature: actualTemperature,
+        temperatureScale: (flag1 & 1) == 0 ? "F" : "C",
+        heatingSetpoint: new BigInteger(1, decoded[24]),
+        thermostatMode: (heatMode == 0) ? "auto" : "schedule",
+        thermostatOperatingState: isHeating ? "heating" : "idle"
+    ]
 }
