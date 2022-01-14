@@ -267,7 +267,7 @@ def getXmlRequest(deviceId, fileName) {
 }
 
 def sendCommand(deviceId, targetName, data) {
-    log.debug("sendCommand(${deviceId}, ${targetName}, ${data})"
+    log.debug("sendCommand(${deviceId}, ${targetName}, ${data})")
     def resp = doCallout("POST", "/devices/sci", getXmlRequest(deviceId, targetName, data), "xml")
     resp.data
 }
