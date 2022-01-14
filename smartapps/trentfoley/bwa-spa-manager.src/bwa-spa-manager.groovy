@@ -297,7 +297,7 @@ def pollChild(child) {
 
     byte[] decoded = encodedData.decodeBase64()
     
-    log.debug(decoded)
+    log.debug(decoded.toString())
 
     // def messageLength = new BigInteger(1, decoded[0])
     def actualTemperature = new BigInteger(1, decoded[6])
