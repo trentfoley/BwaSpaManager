@@ -65,7 +65,7 @@ def initialize() {
 	log.debug "initialize()"
     sendEvent(name: "supportedThermostatModes", value: ["auto", "schedule"], displayed: false)
     refresh()
-    runEvery15Minutes(refresh)
+    runEvery5Minutes(refresh)
 }
 
 // parse events into attributes
