@@ -307,14 +307,19 @@ def pollChild(child) {
     //def temperatureRange = (flag2 & 4) == 4 ? "high" : "low"
     def isHeating = (flag2 & 48) != 0
     
-    if (actualTemperature == 255) {
+    if (actualTemperature > 120) {
     	actualTemperature = child.device.currentValue("temperature")
+    }
+    
+    def heatingSetpoint = new BigInteger(1, decoded[24])
+    if (heatingSetpoint > 104) {
+    	heatingSetpoint = child.device.currentValue("heatingSetpoint")
     }
 
     return [
         temperature: actualTemperature,
         temperatureScale: (flag1 & 1) == 0 ? "F" : "C",
-        heatingSetpoint: new BigInteger(1, decoded[24]),
+        heatingSetpoint: heatingSetpoint,
         thermostatMode: (heatMode == 0) ? "auto" : "schedule",
         thermostatOperatingState: isHeating ? "heating" : "idle"
     ]
