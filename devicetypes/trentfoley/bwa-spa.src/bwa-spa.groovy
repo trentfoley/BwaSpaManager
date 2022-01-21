@@ -92,7 +92,7 @@ def refresh() {
 def setHeatingSetpoint(degreesF) {
     log.debug "setHeatingSetpoint(${degreesF})"
     parent.setHeatingSetpoint(this, degreesF)
-    sendEvent(name: "heatingSetpoint", value: degreesF, unit: "F")
+    refresh()
 }
 
 // Implementation of capability.thermostatMode
@@ -100,7 +100,7 @@ def setHeatingSetpoint(degreesF) {
 def setThermostatMode(String mode) {
     log.debug "setThermostatMode(${mode})"
     parent.setThermostatMode(this, mode)
-    sendEvent(name: "thermostatMode", value: mode)
+    refresh()
 }
 
 // Implementation of capability.thermostatMode
